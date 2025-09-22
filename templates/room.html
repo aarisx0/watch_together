@@ -138,6 +138,103 @@
             margin-top: 8px;
         }
 
+        /* Request Access Section (Participants) */
+        .access-request-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            box-shadow: 0 0 15px #00c9ff;
+        }
+
+        #requestControlBtn {
+            background-color: #00c9ff;
+            color: black;
+            font-weight: bold;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00c9ff, 0 0 20px #00c9ff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #requestControlBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
+        }
+
+        #requestStatus {
+            margin-top: 10px;
+            color: #00ffcc;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        /* Pending Requests Section (Host) */
+        .host-access-requests {
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 0 0 15px #00c9ff;
+        }
+
+        .host-access-requests h4 {
+            color: #00c9ff;
+            margin-bottom: 10px;
+        }
+
+        #pendingRequests li {
+            list-style: none;
+            margin: 6px 0;
+            padding: 8px 12px;
+            background: #111;
+            color: #00c9ff;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 8px #00c9ff;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #pendingRequests button {
+            background-color: #00c9ff;
+            color: black;
+            border: none;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #pendingRequests button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+        }
+
+
+        .upload-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 0 15px #00c9ff;
+            margin: 15px 0;
+        }
+
+        .upload-section h4 {
+            color: #00c9ff;
+            margin-bottom: 10px;
+        }
+
         .copy-button {
             margin-top: 10px;
             padding: 10px 16px;
@@ -153,6 +250,24 @@
         }
 
         .copy-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
+        }
+
+        .upload-btn {
+            display: inline-block;
+            background-color: #00c9ff;
+            color: black;
+            font-weight: bold;
+            padding: 10px 20px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00c9ff, 0 0 20px #00c9ff;
+        }
+
+        .upload-btn:hover {
             transform: scale(1.05);
             box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
         }
@@ -218,12 +333,35 @@
         {% endif %}
         <div class="welcome-container">
             <h3>Welcome {{username}}!</h3>
-             <button id="leaveRoomBtn">Leave Room</button>
+            <button id="leaveRoomBtn">Leave Room</button>
         </div>
+
+        {% if is_host %}
+        <!-- Upload Section (Host Only) -->
+        <div id="upload-section" class="upload-section">
+            <h4>Upload new video</h4>
+            <input type="file" id="videoUpload" multiple accept=".mp4,.webm,.ogg">
+            <button id="uploadBtn" class="upload-btn">Upload</button>
+            <div id="uploadStatus"></div>
+        </div>
+        {% endif %}
+
         <video id="videoPlayer" controls>
             <source src="{{ video_url }}" type="video/mp4">
             your browser does not support this video tag.
         </video>
+        {% if not is_host %}
+        <div class="access-request-section">
+            <button id="requestControlBtn">Request Control</button>
+            <p id="requestStatus"></p>
+        </div>
+        {% else %}
+        <div class="host-access-requests">
+            <h4>Pending Control Requests</h4>
+            <ul id="pendingRequests"></ul>
+        </div>
+        {% endif %}
+
         <div class="link-box">
             Share this room: <br>
             <input type="text" id="room-link" value="{{ request.host_url }}join/{{ room }}" readonly
@@ -244,9 +382,11 @@
         const socket = io();
         const room = "{{room}}";
         const username = "{{username}}";
+        const isHost = "{{is_host}}" === "True";
         const video = document.getElementById('videoPlayer');
         let isseeking = false;
         socket.emit('join_event', { room, username });
+
         document.getElementById("leaveRoomBtn").onclick = () => {
             socket.emit('leave_room', { room, username });
             window.location.href = '/';
@@ -255,23 +395,28 @@
         let issync = false;
         video.addEventListener('seeking', () => {
             isseeking = true;
-            socket.emit('seek_event', { time: video.currentTime, isPlaying: !video.paused, room });
+            if (isHost)
+                socket.emit('seek_event', { time: video.currentTime, isPlaying: !video.paused, room });
+        });
+        video.addEventListener('seeked', () => {
+            isseeking = false;
         });
         video.addEventListener('play', () => {
-            if (!issync) {
+            if (!issync && isHost) {
                 socket.emit('video_event', { action: "play", time: video.currentTime, room });
             }
         });
         video.addEventListener('pause', () => {
-            if (!issync) {
+            if (!issync && isHost) {
                 socket.emit('video_event', { action: "pause", time: video.currentTime, room });
             }
         });
         video.addEventListener('ratechange', () => {
-            socket.emit('speed_event', {
-                speed: video.playbackRate,
-                room: room
-            });
+            if (isHost)
+                socket.emit('speed_event', {
+                    speed: video.playbackRate,
+                    room: room
+                });
         });
         socket.on('seek_event', data => {
             issync = true;
@@ -299,6 +444,42 @@
         socket.on('speed_event', data => {
             video.playbackRate = data.speed;
         });
+        if (!isHost) {
+            const requestBtn = document.getElementById("requestControlBtn");
+            const statusText = document.getElementById("requestStatus");
+
+            if (requestBtn) {
+                requestBtn.onclick = () => {
+                    socket.emit("request_control", { room });
+                    statusText.textContent = "Request sent. Waiting for host approval...";
+                    requestBtn.disabled = true;
+                };
+            }
+
+            socket.on("control_granted", () => {
+                if (statusText) statusText.textContent = "You have been granted control!";
+                if (requestBtn) requestBtn.disabled = false;
+            });
+        } else {
+            const pendingList = document.getElementById("pendingRequests");
+
+            socket.on("control_request_received", data => {
+                const li = document.createElement("li");
+                li.id = `req-${data.user_id}`;
+                li.textContent = `${data.username} requests control`;
+
+                const approveBtn = document.createElement("button");
+                approveBtn.textContent = "Approve";
+                approveBtn.onclick = () => {
+                    socket.emit("grant_control", { room, user_id: data.user_id });
+                    li.remove();
+                };
+
+                li.appendChild(approveBtn);
+                pendingList.appendChild(li);
+            });
+        }
+
 
         const chatArea = document.getElementById("chatArea");
         const chatInput = document.getElementById("chatInput");
@@ -330,6 +511,40 @@
             link.select();
             document.execCommand('copy');
             alert("link is copied to clipboard!");
+        }
+        if (isHost) {
+            const uploadInput = document.getElementById("videoUpload");
+            const uploadBtn = document.getElementById("uploadBtn");
+            const uploadStatus = document.getElementById("uploadStatus");
+
+            uploadBtn.onclick = () => {
+                const files = uploadInput.files;
+                if (!files.length) { alert("Please select video files to upload."); return; }
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) formData.append("files", files[i]);
+
+                fetch(`/room/${room}/upload`, { method: "POST", body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            uploadStatus.textContent = "Uploaded: " + data.uploaded.join(", ");
+                            socket.emit("new_files_uploaded", { room, files: data.uploaded, all_files: data.all_files });
+
+                            // Auto update video source for first file
+                            if (data.uploaded.length && data.all_files.length) {
+                                const first = data.all_files.find(f => f.name === data.uploaded[0]);
+                                if (first) { video.src = first.url; video.load(); }
+                            }
+                        } else uploadStatus.textContent = "Error: " + (data.error || "Upload failed");
+                    })
+                    .catch(err => { console.error(err); uploadStatus.textContent = "Upload failed. Check console."; });
+            };
+
+            socket.on("new_files_uploaded", data => {
+                // Optionally update video src for new files
+                const first = data.all_files.find(f => f.name === data.files[0]);
+                if (first) { video.src = first.url; video.load(); }
+            });
         }
     </script>
 

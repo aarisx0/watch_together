@@ -62,6 +62,15 @@
             cursor: pointer;
             color: #00c9ff;
             user-select: none;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s, transform 0.1s;
+
+        }
+
+        .playlist li:hover {
+            background: #00c9ff;
+            color: #000;
+            transform: scale(1.02);
         }
 
         .playlist li.active {
@@ -72,6 +81,47 @@
 
         .playlist li:last-child {
             border-bottom: none;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 0 15px #00c9ff;
+            margin: 15px 0;
+        }
+
+        .upload-section h4 {
+            color: #00c9ff;
+            margin-bottom: 10px;
+        }
+
+        .upload-section input[type="file"] {
+            display: none;
+            /* hidden, will use label as button */
+        }
+
+        .upload-btn {
+            display: inline-block;
+            background-color: #00c9ff;
+            color: black;
+            font-weight: bold;
+            padding: 10px 20px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00c9ff, 0 0 20px #00c9ff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .upload-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
         }
 
         /* Audio Player */
@@ -236,6 +286,11 @@
             font-family: 'Orbitron', sans-serif;
         }
 
+        #uploadStatus {
+            margin-top: 8px;
+            color: #00ffcc;
+        }
+
         .copy-button {
             margin-top: 10px;
             padding: 10px 16px;
@@ -255,7 +310,89 @@
             transform: scale(1.05);
             box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
         }
+
+         /* Request Access Section (Participants) */
+        .access-request-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+            box-shadow: 0 0 15px #00c9ff;
+        }
+
+        #requestControlBtn {
+            background-color: #00c9ff;
+            color: black;
+            font-weight: bold;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00c9ff, 0 0 20px #00c9ff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #requestControlBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff;
+        }
+
+        #requestStatus {
+            margin-top: 10px;
+            color: #00ffcc;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        /* Pending Requests Section (Host) */
+        .host-access-requests {
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #00c9ff;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            box-shadow: 0 0 15px #00c9ff;
+        }
+
+        .host-access-requests h4 {
+            color: #00c9ff;
+            margin-bottom: 10px;
+        }
+
+        #pendingRequests li {
+            list-style: none;
+            margin: 6px 0;
+            padding: 8px 12px;
+            background: #111;
+            color: #00c9ff;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 8px #00c9ff;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #pendingRequests button {
+            background-color: #00c9ff;
+            color: black;
+            border: none;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #pendingRequests button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+        }
         
+
 
         #leaveRoomBtn {
             margin-top: 15px;
@@ -322,6 +459,16 @@
 
         <p>Welcome {{username}}!</p>
         <button id="leaveRoomBtn">Leave Room</button>
+
+        {% if is_host %}
+        <div id="upload-section" class="upload-section">
+            <h4>Upload new music</h4>
+            <input type="file" id="musicUpload" multiple accept=".mp3,.wav,.ogg,.flac">
+            <button id="uploadBtn">Upload</button>
+            <div id="uploadStatus"></div>
+        </div>
+        {% endif %}
+
         <div class="playlist-wrap">
             <h4>Music Queue</h4>
             <ul id="playlist" class="playlist">
@@ -342,6 +489,18 @@
             </div>
             <span id="nowPlaying"></span>
         </div>
+
+        {% if not is_host %}
+        <div class="access-request-section">
+            <button id="requestControlBtn">Request Control</button>
+            <p id="requestStatus" style="color:#00ffcc;"></p>
+        </div>
+        {% else %}
+        <div class="host-access-requests">
+            <h4>Pending Control Requests</h4>
+            <ul id="pendingRequests" style="list-style:none; padding:0;"></ul>
+        </div>
+        {% endif %}
 
         <div class="link-box">
             Share this room: <br>
@@ -377,6 +536,10 @@
         const room = "{{room}}";
         const username = "{{username}}";
         socket.emit('join_event', { room: room, username: username });
+        const isHost = "{{is_host}}" === "True";
+        const uploadSection = document.getElementById("upload-section");
+        if (uploadSection) uploadSection.style.display = isHost ? "block" : "none";
+        // Leave room
 
         document.getElementById("leaveRoomBtn").onclick = () => {
             socket.emit('leave_room', { room, username });
@@ -407,45 +570,53 @@
         loadTrack(0, false);
         document.querySelectorAll('#playlist li').forEach((li, idx) => {
             li.onclick = () => {
-                socket.emit('track_change', { track: idx, room });
+                if (isHost) socket.emit('track_change', { track: idx, room });
+                else alert("Only the host can change tracks.");
             }
         });
         document.getElementById("nextBtn").onclick = () => {
+            if (!isHost) return alert("Only the host can control tracks.");
             let next = (currentTrack + 1) % playlist.length;
             socket.emit('track_change', { track: next, room });
         }
         document.getElementById("prevBtn").onclick = () => {
+            if (!isHost) return alert("Only the host can control tracks.");
             let prev = (currentTrack - 1 + playlist.length) % playlist.length;
             socket.emit('track_change', { track: prev, room });
         }
         document.getElementById("shuffleBtn").onclick = () => {
+            if (!isHost) return alert("Only the host can shuffle.");
             let idx = Math.floor(Math.random() * playlist.length);
             socket.emit("track_change", { track: idx, room })
         }
 
         audio.addEventListener('play', () => {
-            if (!issync) {
+            if (!issync && isHost) {
                 socket.emit('music_event', { action: "play", time: audio.currentTime, room, track: currentTrack });
             }
         });
         audio.addEventListener('pause', () => {
-            if (!issync) {
+            if (!issync && isHost) {
                 socket.emit('music_event', { action: "pause", time: audio.currentTime, room, track: currentTrack });
             }
         });
         audio.addEventListener("ended", () => {
-            let next = (currentTrack + 1) % playlist.length;
-            socket.emit("track_change", { track: next, room });
+            if (isHost) {
+                let next = (currentTrack + 1) % playlist.length;
+                socket.emit("track_change", { track: next, room });
+            }
         })
         audio.addEventListener('ratechange', () => {
-            socket.emit('music_speed', {
-                speed: audio.playbackRate,
-                room: room
-            });
+            if (isHost) {
+                socket.emit('music_speed', {
+                    speed: audio.playbackRate,
+                    room: room
+                });
+            }
         });
 
         audio.addEventListener("seeked", () => {
-            if (!issync) {
+            if (!issync && isHost) {
                 socket.emit("seek_event", {
                     time: audio.currentTime,
                     room: room,
@@ -523,6 +694,39 @@
             alert(`${data.username} has joined the room.`);
         });
 
+        if (!isHost) {
+            const requestBtn = document.getElementById("requestControlBtn");
+            const statusText = document.getElementById("requestStatus");
+
+            requestBtn.onclick = () => {
+                socket.emit("request_control", { room });
+                statusText.textContent = "Request sent. Waiting for host approval...";
+                requestBtn.disabled = true;
+            };
+
+            socket.on("control_granted", () => {
+                statusText.textContent = "You have been granted control!";
+            });
+        } else {
+            const pendingList = document.getElementById("pendingRequests");
+
+            socket.on("control_request_received", data => {
+                const li = document.createElement("li");
+                li.id = `req-${data.user_id}`;
+                li.textContent = `${data.username} requests control `;
+
+                const approveBtn = document.createElement("button");
+                approveBtn.textContent = "Approve";
+                approveBtn.style.marginLeft = "10px";
+                approveBtn.onclick = () => {
+                    socket.emit("grant_control", { room, user_id: data.user_id });
+                    li.remove();
+                };
+
+                li.appendChild(approveBtn);
+                pendingList.appendChild(li);
+            });
+        }
 
         const chatArea = document.getElementById("chatArea");
         const chatInput = document.getElementById("chatInput");
@@ -554,6 +758,56 @@
             link.select();
             document.execCommand('copy');
             alert("link is copied to clipboard!");
+        }
+        // Upload music (host only)
+        if (isHost) {
+            const uploadInput = document.getElementById("musicUpload");
+            const uploadBtn = document.getElementById("uploadBtn");
+            const uploadStatus = document.getElementById("uploadStatus");
+
+            uploadBtn.onclick = () => {
+                const files = uploadInput.files;
+                if (!files.length) { alert("Please select music files to upload."); return; }
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) formData.append("files", files[i]);
+
+                fetch(`/room/${room}/upload`, { method: "POST", body: formData })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            uploadStatus.textContent = "Uploaded: " + data.uploaded.join(", ");
+                            socket.emit("new_files_uploaded", { room, files: data.uploaded });
+                            data.uploaded.forEach(filename => {
+                                const fileObj = data.all_files.find(f => f.name === filename);
+                                if (!fileObj) return;
+                                const li = document.createElement("li");
+                                li.textContent = filename;
+                                li.dataset.index = playlist.length;
+                                li.dataset.src = fileObj.url;
+                                li.onclick = () => socket.emit("track_change", { track: parseInt(li.dataset.index), room });
+                                document.getElementById("playlist").appendChild(li);
+                                playlist.push({ name: filename, src: fileObj.url });
+                            });
+                        } else uploadStatus.textContent = "Error: " + (data.error || "Upload failed");
+                    })
+                    .catch(err => { console.error(err); uploadStatus.textContent = "Upload failed. Check console."; });
+            };
+
+            socket.on("new_files_uploaded", data => {
+                data.files.forEach(filename => {
+                    if (!playlist.find(t => t.name === filename)) {
+                        const fileObj = data.all_files.find(f => f.name === filename);
+                        if (!fileObj) return;
+                        const li = document.createElement("li");
+                        li.textContent = filename;
+                        li.dataset.index = playlist.length;
+                        li.dataset.src = fileObj.url;
+                        li.onclick = () => socket.emit("track_change", { track: parseInt(li.dataset.index), room });
+                        document.getElementById("playlist").appendChild(li);
+                        playlist.push({ name: filename, src: fileObj.url });
+                    }
+                });
+            });
         }
     </script>
 

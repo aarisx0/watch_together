@@ -137,6 +137,16 @@ class RoomMember(db.Model):
     joined_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     room = db.relationship("Room", back_populates="memberships")
     user = db.relationship("User", backref="rooms")
+    
+class RoomAccessRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey("room.id", ondelete="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    status = db.Column(db.String(20), default="pending")  # pending, approved, denied
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    room = db.relationship("Room", backref="access_requests")
+    user = db.relationship("User", backref="access_requests")
       
 class loginform(FlaskForm):
     email=StringField('Email', validators=[DataRequired(),Email()])
@@ -401,6 +411,70 @@ def create_room():
         return jsonify({"redirect_url": url_for('music_room', room=room, encrypted_username=encrypted_username)})
 
 
+@csrf.exempt
+@app.route("/room/<room>/upload", methods=["POST"])
+@login_required
+def upload_to_room(room):
+    room_obj = Room.query.filter_by(name=room).first()
+    if not room_obj:
+        return jsonify({"error": "Room not found"}), 404
+
+    # Fetch current user
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({"error": "User not found"}), 403
+
+    # Video or multiple music files
+    if room_obj.room_type == "video":
+        video = request.files.get("video")
+        if not video or not video.filename:
+            return jsonify({"error": "No video uploaded"}), 400
+        # Store as video.mp4
+        key = f"rooms/{room}/video.mp4"
+        r2_put_fileobj(key, video)
+        socketio.emit("new_files_uploaded", {"room": room, "files": ["video.mp4"]}, room=room)
+        return jsonify({"success": True, "uploaded": ["video.mp4"]})
+
+    elif room_obj.room_type == "music":
+        files = request.files.getlist("files")
+        if not files:
+            return jsonify({"error": "No music files uploaded"}), 400
+
+        uploaded = []
+        for file in files:
+            if not file.filename:
+                continue
+            filename = secure_filename(file.filename)
+            if not filename.lower().endswith(('.mp3', '.wav', '.ogg', '.flac')):
+                continue  # skip invalid files
+            key = f"rooms/{room}/tracks/{filename}"
+            r2_put_fileobj(key, file)
+            uploaded.append(filename)
+
+        if not uploaded:
+            return jsonify({"error": "No valid music files uploaded"}), 400
+
+        # Refresh session music file list
+        s3 = r2_client()
+        prefix = f"rooms/{room}/tracks/"
+        paginator = s3.get_paginator('list_objects_v2')
+        music_files = []
+        for page in paginator.paginate(Bucket=R2_BUCKET, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                rel = obj['Key'][len(prefix):]
+                if rel.lower().endswith(('.mp3', '.wav', '.ogg', '.flac')):
+                    music_files.append(rel)
+        session['music_files_'+room] = music_files
+
+        # Notify room members
+        socketio.emit("new_files_uploaded", {"room": room, "files": uploaded}, room=room)
+
+        return jsonify({"success": True, "uploaded": uploaded, "all_files": music_files})
+
+    else:
+        return jsonify({"error": "Unsupported room type"}), 400
+
+    
 @app.route('/join/<room>')
 @login_required
 def join_room_by_link(room):
@@ -453,7 +527,47 @@ def join_room_by_link(room):
     flash("Invalid room type", "error")
     return redirect(url_for('home'))
         
+@socketio.on('request_control')
+def handle_request_control(data):
+    """Participant requests control access in a music room."""
+    room_name = data['room']
+    user = User.query.get(session['user_id'])
+    room_obj = Room.query.filter_by(name=room_name).first()
+    if not room_obj or not user:
+        return
 
+    # Add to DB if not already requested
+    existing = RoomAccessRequest.query.filter_by(room_id=room_obj.id, user_id=user.id).first()
+    if not existing:
+        req = RoomAccessRequest(room_id=room_obj.id, user_id=user.id)
+        db.session.add(req)
+        db.session.commit()
+
+    # Notify host
+    host_user = User.query.get(room_obj.host_id)
+    if host_user:
+        emit("control_request_received", {
+            "username": user.name,
+            "user_id": user.id,
+            "room": room_name
+        }, room=f"user_{host_user.id}")
+        
+@socketio.on('grant_control')
+def handle_grant_control(data):
+    room_name = data['room']
+    user_id = data['user_id'] 
+    room_obj = Room.query.filter_by(name=room_name).first()
+    host_user = User.query.get(session['user_id'])
+
+    if not room_obj or not host_user or room_obj.host_id != host_user.id:
+        return
+    req = RoomAccessRequest.query.filter_by(room_id=room_obj.id, user_id=user_id).first()
+    if req:
+        req.status = "approved"
+        db.session.commit()
+
+    emit('control_granted', room=f"user_{user_id}")
+    
 @app.route('/room/<room>/<encrypted_username>')
 @login_required
 def room(room,encrypted_username):
@@ -531,6 +645,11 @@ def handle_join_room(data):
         if host_name and host_name in room_users[room]:
             emit('request_sync', {'target': username}, room=room, include_self=False)
     
+@socketio.on('connect')
+def on_connect():
+    if 'user_id' in session:
+        join_room(f"user_{session['user_id']}")
+        
 @socketio.on('leave_room')
 def handle_leave_room(data):
     room=data['room']
